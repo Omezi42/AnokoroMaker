@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>あの頃の自作TCG盤面シミュレーター</title>
+    <!-- Tailwind CSSの読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f0f4f8;
+            font-family: sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        main {
+            background-image: url('https://images.unsplash.com/photo-1533035336122-4327d345c5fe?q=80&w=2070&auto.format&fit.crop');
+            background-size: cover;
+            background-position: center;
+        }
+        .card { position: relative; user-select: none; transition: all 0.2s ease-in-out; overflow: visible; }
+        .full-art-card {
+            width: 8rem; height: 11.5rem; background-color: #333;
+            border: 2px solid #9ca3af; border-radius: 0.5rem; overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .full-art-card-image { width: 100%; height: 100%; object-fit: cover; }
+        .full-art-card:hover { transform: scale(1.05); border-color: #3b82f6; z-index: 10; }
+        .monster-card {
+            width: 8rem; height: 9.75rem; background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 0.5rem; padding: 0.5rem; display: flex; flex-direction: column;
+            align-items: center; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .monster-image-container { width: 100%; flex-grow: 1; display:flex; align-items: center; justify-content: center; margin-bottom: 0.25rem; }
+        .monster-image { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.3)); transition: transform 0.2s ease; }
+        .monster-card:hover .monster-image { transform: scale(1.1); }
+        .power-display {
+            background-color: rgba(0,0,0,0.8); border-radius: 9999px; padding: 0.1rem 0.5rem;
+            border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); flex-shrink: 0;
+        }
+        .power-input {
+            width: 3.5rem; background: transparent; border: none; color: white;
+            font-weight: bold; text-align: center; font-size: 1rem;
+        }
+        .power-input:focus, .hp-input:focus, .counter-input:focus { outline: none; background-color: rgba(255,255,255,0.1); border-radius: 0.25rem; }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        .energy-card { width: 3rem; height: 3rem; margin: 0 -0.5rem; }
+        .energy-image { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); }
+        .delete-btn {
+            position: absolute; top: -0.75rem; right: -0.75rem; background-color: #dc2626; color: white;
+            border-radius: 9999px; width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; font-weight: bold; line-height: 1;
+            transition: all 0.2s ease; transform: scale(0); opacity: 0; z-index: 20;
+        }
+        .card:hover .delete-btn { transform: scale(1); opacity: 1; }
+        .counter-display {
+            position: absolute; top: -0.5rem; right: -0.5rem; z-index: 10;
+            width: 2rem; height: 2rem; background-color: #4f46e5; color: white; border: 2px solid white;
+            display: flex; align-items: center; justify-content: center;
+            transform: rotate(45deg); border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+        .counter-input { transform: rotate(-45deg); width: 100%; text-align: center; background: transparent; font-weight: bold; }
+        #player-hand .card { margin-left: -50px; }
+        #player-hand .card:hover { transform: translateY(-20px) scale(1.1); }
+        .drop-zone {
+            display: flex; align-items: center; justify-content: center;
+            border: 4px dashed rgba(255, 255, 255, 0.3); border-radius: 0.5rem;
+            background-color: rgba(0, 0, 0, 0.2); padding: 0.5rem; transition: all 0.2s ease;
+        }
+        .card-slot { min-height: 12rem; min-width: 8.5rem; }
+        .central-column { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; flex: 1 1 auto; min-width: 0; }
+        .monster-zone { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; justify-content: center; min-height: 10rem; width: 100%; max-width: 48rem; }
+        .energy-zone { width: 100%; max-width: 48rem; min-height: 4rem; flex-wrap: wrap; }
+        .hp-display {
+            background-color: rgba(0,0,0,0.7); padding: 0.5rem 1rem; border-radius: 0.5rem;
+            text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2); color: white; border: 2px solid;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .hp-input { width: 8rem; background: transparent; border: none; color: white; font-weight: bold; text-align: center; font-size: 1.875rem; line-height: 2.25rem; }
+        #resizer { background-color: #e5e7eb; cursor: col-resize; width: 8px; transition: background-color 0.2s ease; }
+        #resizer:hover { background-color: #3b82f6; }
+        .search-result { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; overflow: hidden; }
+        .search-result > * { pointer-events: none; }
+        .search-result-img { width: 4rem; height: 4rem; object-fit: cover; opacity: 0.4; border-radius: 0.25rem; flex-shrink: 0; }
+        .search-result.dragging, .card.dragging { opacity: 0.4; }
+        .drop-zone.drag-over { border-style: solid; border-color: #22c55e; background-color: rgba(34, 197, 94, 0.2); transform: scale(1.02); }
+        #trash-can { position: fixed; bottom: 1rem; right: 1rem; width: 4rem; height: 4rem; z-index: 100; transition: all 0.2s ease; }
+        #trash-can.drag-over { background-color: rgba(239, 68, 68, 0.5); border-color: #ef4444; transform: scale(1.1); }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="flex flex-col h-screen">
+        <header class="bg-white shadow-md p-4 flex justify-between items-center z-10 border-b">
+            <h1 class="text-xl font-bold text-gray-800">あの頃の自作TCG盤面シミュレーター</h1>
+            <div class="flex items-center gap-4">
+                <button id="undo-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">一手戻る</button>
+                <button id="reset-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">リセット</button>
+                <button id="save-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">盤面を保存</button>
+            </div>
+        </header>
+
+        <div class="flex flex-1 overflow-hidden">
+            <aside id="sidebar" class="bg-gray-50 p-6 overflow-y-auto border-r flex-shrink-0">
+                <h2 class="text-lg font-semibold mb-4 border-b pb-2">情報編集</h2>
+                <div class="mb-6">
+                    <h3 class="text-md font-bold text-green-600 mb-3">カード検索 & ドラッグ</h3>
+                    <input type="search" id="card-search" placeholder="カード名を検索..." class="block w-full rounded-md py-2 px-3">
+                    <div id="search-results" class="mt-2 space-y-1 max-h-96 overflow-y-auto"></div>
+                </div>
+                 <div class="mb-6">
+                    <h3 class="text-md font-bold text-indigo-600 mb-3">カウンター</h3>
+                    <div id="draggable-counter" draggable="true" class="p-2 rounded-lg bg-indigo-500 text-white font-bold text-center cursor-move">
+                        カウンターをドラッグ
+                    </div>
+                </div>
+            </aside>
+            
+            <div id="resizer"></div>
+
+            <main class="flex-1 p-4 overflow-y-auto flex flex-col justify-between space-y-4">
+                <!-- Opponent's Board -->
+                <div id="opponent-board" class="w-full flex justify-center items-start gap-4">
+                    <div id="opponent-field-zone" class="drop-zone card-slot flex-shrink-0" data-owner="opponent" data-area="fieldCard"><span class="text-white/50 pointer-events-none">フィールド</span></div>
+                     <div class="central-column">
+                         <div id="opponent-monster-zone" class="drop-zone monster-zone" data-owner="opponent" data-area="monsters"><span class="text-white/50 pointer-events-none">モンスター</span></div>
+                         <div id="opponent-energy-zone" class="drop-zone energy-zone" data-owner="opponent" data-area="energy"><span class="text-white/50 pointer-events-none">エネルギー</span></div>
+                         <div id="opponent-hp-display" class="hp-display border-red-500"><div class="text-sm">相手HP</div><input type="number" id="opponent-hp-input" class="hp-input" value="4000"></div>
+                     </div>
+                    <div id="opponent-trap-zone" class="drop-zone card-slot flex-shrink-0" data-owner="opponent" data-area="traps"><span class="text-white/50 pointer-events-none">罠</span></div>
+                </div>
+                <div id="player-board-and-hand" class="flex flex-col items-center gap-2">
+                     <div id="player-board" class="w-full flex justify-center items-end gap-4">
+                        <div id="player-field-zone" class="drop-zone card-slot flex-shrink-0" data-owner="player" data-area="fieldCard"><span class="text-white/50 pointer-events-none">フィールド</span></div>
+                        <div class="central-column">
+                             <div id="player-monster-zone" class="drop-zone monster-zone" data-owner="player" data-area="monsters"><span class="text-white/50 pointer-events-none">モンスター</span></div>
+                             <div id="player-energy-zone" class="drop-zone energy-zone" data-owner="player" data-area="energy"><span class="text-white/50 pointer-events-none">エネルギー</span></div>
+                             <div id="player-hp-display" class="hp-display border-blue-500"><div class="text-sm">自分HP</div><input type="number" id="player-hp-input" class="hp-input" value="4000"></div>
+                        </div>
+                        <div id="player-trap-zone" class="drop-zone card-slot flex-shrink-0" data-owner="player" data-area="traps"><span class="text-white/50 pointer-events-none">罠</span></div>
+                    </div>
+                     <div id="player-hand" class="drop-zone flex justify-center items-end h-48 w-full" data-owner="player" data-area="hand"></div>
+                </div>
+            </main>
+
+            <div id="trash-can" class="drop-zone rounded-full border-red-500">
+                 <svg class="w-8 h-8 text-white/70 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const cardNames = [ "おちゃめな魔法使い（プロモ）","かたい貝","かにもぐら先輩","かわいいあざらし","ぬらりひょん","はりねずみ","はりトラップ","アイアンローダー","アイスドラゴン","アクセラモーター","アックスゾンビ","アマビエ","イノシシ","インパクトエネルギー","インパクトガイド","ウサギ","ウミガメ","エレメンタルエルフ","オオカミ","オーガ","オーバーエネルギー","カバ","ガーゴイル","キュアエネルギー","キュリアス海","ギガドラゴン","クリスタルドラゴン","グランドエネルギー","コウモリ","コバンザメ","ゴブリン突撃！","ゴーレム","サウザンドラゴン","サソリ","サンエネルギー","ザコ魔法陣","シカ","シビレナマズ","スマッシュエネルギー","スライム","スライムタンク","スーパードラゴン","ゼウス","ソラトビペンギン","ソリッドスライム","ゾンビドラゴン","ゾンビレックス","タ―ジンバ海岸","ダメージエネルギー","ダークエネルギー","チビドラゴン","テントウムシ","ディエティの月明","デカスライム","トライデントマスター","ドラゴン","ドローエネルギー","ネクロマンサー","ノーマルエネルギー","ハイドロエネルギー","ハブタエラプトル","ハンドレッドラゴン","バブルスライム","バーンドラゴン","パワーエネルギー","ヒツジ","ヒールエネルギー","ファイアドラゴン","フェアリー","フォレストエネルギー","ブラックグリフォン","ブレイズスラスター","ブレイズドラゴン","ブレイブエネルギー","ブレードゾンビ","ブーストエネルギー","プラスラッシャー","ヘビ","ヘヴンエネルギー","ホワイトグリフォン","ボムゾンビ","ボルケーノエネルギー","ポイズンゾンビ","マイナスナイパー","マスターゴブリン","マリンエネルギー","ミノタウロス","ラヴァエネルギー","リチャージエネルギー","リヴァイアサン","レインボーマジシャン","レイヴンエネルギー","ワイバーン","万緑の巨象","三剣の意志","丸太のゴーレム","丸太騙し","二者択双","亞の祠","人喰い鮫","人工生命 448号","人形の一撃","人魚の涙","仮面英雄バンブート","休息","供物魔法陣","信じる心","傘化け","傷薬","働きアリ","光のカーテン","光の蝕み","光天使ナディ","六星門","共鳴","兵隊アリ","再起の天使","冒険者","冷たき愛","凍りスライム","凍土の王","凶暴化","刀羽のプテラ","刃尾の竜","初級魔法の教え","剛健なツリーフォーク","剣ゴブリン","力の吸収","南瓜の魔物","原始の種","原石杖の魔術師","双鋏型掘削機","双頭ゾンビ","古びた加速部品","古びた地図","古びた検知部品","古びた航海図","古びた駆動部品","古代樹の魔物","呪書の悪魔","呪術の仮面","呼竜術","命の天樹","回生の天使","回生の天使（プロモ）","回転刃","因幡の白うさぎ","地割れ","堅盾のトリケラ","増殖研究","夜の騎士","夢の思念体","夢幻の管理人","夢見屋 亡者＆研究者","大槍角の鮫","大盾の幽霊","大翼のハーピー","大胆な潜伏","大自然の超越","大蛇","天使スライム","天啓","天界の泉","天竜剣","天逆鉾の破片","天鎧竜ウラノス","天鎧騎士シエロ","女王蟻","子供オーガ","安息の導き","完全燃焼","宝石姫サファイア","宝石姫トパーズ","宝石姫ルビー","宵闇の水面","封印されし悪魔像","尖晶石の人形","尖晶石の精霊","屍動鬼","山脈崩し","山麓の補給兵","岩の人形","崖上からの奇襲","崖上の防衛砦","巨大な門","帯電の矢","平穏の使者","幸運を呼ぶ鳥","幽体化","弩弓の騎士","弱者の嘆き","弱者の爆発","弱者の結束","彩戦紙インディゴ","彩戦紙トパーズ","彩戦紙ネイビー","彩戦紙マゼンタ","彼岸の精霊 カナロア","彼岸の魔女 リリィ","徴兵","怠惰な海賊嬢","怪力の甲虫","怪物蟹","怪竜の書","悪意の芽吹","悪戯フェアリー","悪魔な注文","惨然槍の邪竜","慈愛フェアリー","成長","戒律の僧","戦車ゴブリン","戦闘兵器：B","戦闘兵器：C","戦闘兵器：H（プロモ）","戦闘兵器：SR","手鏡の幽霊","抵抗","招かれざる恐怖","拡散炎","掌握","採掘ゴブリン","撞木鮫","整備","斧の戦士","新緑の石碑","旗持ちの騎士","日傘の海賊嬢","旧式機械装甲","星になる","暗殺","暴牙のティラノ","最終兵器：MS","月光の天使","月宿る海","月迎え","木の宝箱","木立火","林道の亡霊","枯れ木の魔物","栄華の花園","桜小鳥","棒ゴブリン","森の脅威","森の贄","森の雫","森焼き","極彩戦紙アマル","極彩鳥の巣","樹葉の幽霊","武装強化","歪な氷像","死体漁り","死神の石柱","毒入り傷薬","毒殺","毒沼の竜","毒波","水の精霊","水の魔法使い","水の魔法使い（プロモ）","水鉄砲ゴブリン","氷の雨","氷壁","泉の水瓶","泡の異形","波竜術","洞窟の悪魔","活竜術","海坊主","海底探査","海賊砲","海賊船","海賊長ヴァルロス","海風の略奪者","消耗品","深海の禍根","深青の大鯨","混濁","湖畔の幽霊","火の輪","火の魔法使い","火口のヌシ","火山弾","火炎式魔力砲","火花","火薬の悪魔","火車","灰の大地","災いの渦潮","災厄","炎の精霊","炎剣の騎士","炎天使ジダ","炎鱗の鮫","炎鱗双剣","炎鱗狩りの剣士","炎鱗竜プロクス","点火","無の創造","無形の霊術師","無限の恵沢","焦げスライム","焼き魚","焼却","煌めく尖晶石","熟達の女騎士","燃えトカゲ","燃天の熾天使","爆発","爆発魚","獣使い","王国の参謀","王国の弓騎士","王国の槍騎士","王国の騎士団長","甘誘の悪魔","畏怖の紋章","疑似餌付き","白蛇","白詰草の魔物","白魔の訪れ","百鬼夜行","盗み","盾鋏の蟹","知識の波","短剣の騎士","石の剣","石ゴブリン","石鎚の鍛治師","砂浜のゴーレム","破邪の天使","碑獣の刻石","碑獣アリオール","碑獣ガリル","碑獣タイタン","碑獣ヴィファル","碧い花","祈りの天使像","神秘への遭遇","禁忌の錬成","秘薬の治療師","突風","竜術師","竜討毒の鳥","竹の魔物","笑うエイ","篝火の幽霊","籠罠","糸動奇 柱","糸動奇 環","糸動奇 箱","糸動源","紅天狗茸の魔物","紅蓮球","紅魚","紫月昇り","絵画の幽霊","絶対神","絶望の招来","網罠","緊急発進台","緑の大地","緑化","縄刃投げ","縛り上げ","繁栄","繁茂する根","羊歯の魔物","翠の古代魚","翠鱗のパラサウロロフス","翼落とし","腐りスライム","腹ごしらえ","自律機シップマン","自律機パイルマン","自律機フォースマン","自立機カメラマン","自立機ジャンクマン","自立機スイッチマン","自立機タイヤマン","自立機トラックマン","自立機ファイアマン","自走式裁断機","船霊逆浪海域","色彩共鳴","苔のゴーレム","草の魔物","華乙女ベゴニア","落とし穴","落石","蒸気機関の古代機","蒼魚","藪蛇","蝿取草の魔物","融解","蟻司令官","蠢く墓場","血の鎌使い","裁きの日","裂爪のラプトル","補給物資","角笛","解体遊び","討伐依頼","詠唱魔方陣・奔流","詠唱魔方陣・野生","誓いの天使","豊穣の女神","赤蛇","超爆発","超臨界","転換","軽魔法陣詠唱機","輝化","輪廻転生","轟雷","追放","遺跡の護り手","還り門の森","還元","部隊指揮官","酒呑童子","酸性雨","金貨の悪魔","釣り人","釣果","鈍化","鉄鎧のアンキロ","銀雪の幼竜","銀雪の灰竜","銀雪の白竜","銀雪の蒼竜","銀雪夜","銅剣の騎士","鋼翼の竜","錆のランタン","鍵の精霊","鎧ゴブリン","開花","闇の誘惑","闇の誘惑（プロモ）","闇討ち","陽光の獅子","階級制度","集団戦法","雪女","雲のゴーレム","雷神","雷鳴の天馬","霊魂の世","霧中","青空ゴブリン","頑強な機兵","願いの泉","風化","風読みのハーピー","飛びナイフ","鬼火","魂の復元","魂宿りの巨剣","魔力の小瓶","魔力の盃","魔力炉","魔法陣詠唱機","魔石の精霊","魔石を統べる精霊王","魔術書","魔術書庫","魚群魔法陣","鮮赤の不死鳥","鳥飼いの魔女","鵺","黄金蟹","黎明の天使","黒い花"];
+            const cardDatabase = cardNames.map(name => ({ name }));
+            const initialGameState = () => ({
+                player: { hp: 4000, hand: [], monsters: [], energy: [], fieldCard: null, traps: [] },
+                opponent: { hp: 4000, monsters: [], energy: [], fieldCard: null, traps: [] },
+            });
+            let gameState = initialGameState();
+            let history = [];
+            const zoneLimits = { monsters: 10, energy: 16, fieldCard: 1, traps: 3, hand: Infinity };
+
+            const elements = {
+                sidebar: document.getElementById('sidebar'),
+                resizer: document.getElementById('resizer'),
+                undoButton: document.getElementById('undo-button'),
+                resetButton: document.getElementById('reset-button'),
+                playerHpInput: document.getElementById('player-hp-input'),
+                opponentHpInput: document.getElementById('opponent-hp-input'),
+                cardSearchInput: document.getElementById('card-search'),
+                searchResults: document.getElementById('search-results'),
+                saveButton: document.getElementById('save-button'),
+                dropZones: document.querySelectorAll('.drop-zone'),
+                draggableCounter: document.getElementById('draggable-counter'),
+                trashCan: document.getElementById('trash-can'),
+            };
+
+            const saveState = () => {
+                history.push(JSON.parse(JSON.stringify(gameState)));
+                if (history.length > 30) history.shift();
+                updateUndoButton();
+            };
+            const updateUndoButton = () => {
+                elements.undoButton.disabled = history.length === 0;
+            };
+
+            const createCardHTML = (card, owner, area, index) => {
+                const cardDiv = document.createElement('div');
+                cardDiv.classList.add('card');
+                cardDiv.dataset.owner = owner;
+                cardDiv.dataset.area = area;
+                cardDiv.dataset.index = index;
+                const safeFileName = encodeURIComponent(card.name);
+
+                if (area !== 'energy') cardDiv.draggable = true;
+
+                if (area === 'monsters') {
+                    // ... (monster card logic)
+                    cardDiv.classList.add('monster-card');
+                    card.power = card.power === undefined ? 100 : card.power;
+                    cardDiv.innerHTML = `<div class="monster-image-container"><img src="images/illusts/${safeFileName}_transparent.png" class="monster-image"></div><div class="power-display"><input type="number" class="power-input" value="${card.power}"></div>`;
+                    const powerInput = cardDiv.querySelector('.power-input');
+                    powerInput.onchange = (e) => card.power = parseInt(e.target.value, 10) || 0;
+                    powerInput.onclick = (e) => e.stopPropagation();
+                } else if (area === 'energy') {
+                    // ... (energy card logic)
+                    cardDiv.classList.add('energy-card');
+                    cardDiv.innerHTML = `<img src="images/illusts/${safeFileName}_transparent.png" class="energy-image">`;
+                } else {
+                    // ... (full-art card logic)
+                    cardDiv.classList.add('full-art-card');
+                    cardDiv.innerHTML = `<img src="images/cards/${safeFileName}.png" class="full-art-card-image">`;
+                }
+                
+                // Add Counter Display
+                if (card.counters > 0) {
+                    const counterDiv = document.createElement('div');
+                    counterDiv.className = 'counter-display';
+                    counterDiv.innerHTML = `<input type="number" class="counter-input" value="${card.counters}">`;
+                    counterDiv.onclick = (e) => e.stopPropagation();
+                    const counterInput = counterDiv.querySelector('input');
+                    counterInput.addEventListener('change', (e) => {
+                        saveState();
+                        card.counters = parseInt(e.target.value, 10) || 0;
+                        if(card.counters <= 0) delete card.counters;
+                        render();
+                    });
+                    cardDiv.appendChild(counterDiv);
+                }
+
+                // Add Delete Button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation(); saveState();
+                    if (area === 'fieldCard') gameState[owner].fieldCard = null;
+                    else gameState[owner][area].splice(index, 1);
+                    render();
+                };
+                cardDiv.appendChild(deleteBtn);
+                
+                // Card Drag & Drop Listeners
+                cardDiv.addEventListener('dragstart', (e) => {
+                    e.stopPropagation();
+                    e.currentTarget.classList.add('dragging');
+                    e.dataTransfer.setData('application/json', JSON.stringify({ owner, area, index }));
+                });
+                cardDiv.addEventListener('dragend', (e) => e.currentTarget.classList.remove('dragging'));
+
+                cardDiv.addEventListener('dragover', e => { e.preventDefault(); });
+                cardDiv.addEventListener('drop', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    if (e.dataTransfer.getData('text/plain') === 'counter') {
+                        saveState();
+                        card.counters = (card.counters || 0) + 1;
+                        render();
+                    }
+                });
+
+                return cardDiv;
+            };
+            
+            const render = () => {
+                const zoneMap={playerHand:{cards:gameState.player.hand,owner:"player",area:"hand",placeholder:""},playerMonsterZone:{cards:gameState.player.monsters,owner:"player",area:"monsters",placeholder:"モンスター"},playerEnergyZone:{cards:gameState.player.energy,owner:"player",area:"energy",placeholder:"エネルギー"},playerTrapZone:{cards:gameState.player.traps,owner:"player",area:"traps",placeholder:"罠"},playerFieldZone:{card:gameState.player.fieldCard,owner:"player",area:"fieldCard",placeholder:"フィールド"},opponentMonsterZone:{cards:gameState.opponent.monsters,owner:"opponent",area:"monsters",placeholder:"モンスター"},opponentEnergyZone:{cards:gameState.opponent.energy,owner:"opponent",area:"energy",placeholder:"エネルギー"},opponentTrapZone:{cards:gameState.opponent.traps,owner:"opponent",area:"traps",placeholder:"罠"},opponentFieldZone:{card:gameState.opponent.fieldCard,owner:"opponent",area:"fieldCard",placeholder:"フィールド"}};
+                elements.playerHpInput.value = gameState.player.hp;
+                elements.opponentHpInput.value = gameState.opponent.hp;
+                for(const[id,data]of Object.entries(zoneMap)){const zoneEl=document.getElementById(id.replace(/([A-Z])/g,"-$1").toLowerCase());if(data.card!==undefined){zoneEl.innerHTML=!data.card?`<span class="text-white/50 pointer-events-none">${data.placeholder}</span>`:"";if(data.card)zoneEl.appendChild(createCardHTML(data.card,data.owner,data.area,0))}else{zoneEl.innerHTML=data.cards.length>0?"":`<span class="text-white/50 pointer-events-none">${data.placeholder}</span>`;data.cards.forEach((card,index)=>zoneEl.appendChild(createCardHTML(card,data.owner,data.area,index)))}}
+            };
+
+            const renderSearchResults = (results) => {
+                elements.searchResults.innerHTML = '';
+                results.forEach(card => {
+                    const safeFileName = encodeURIComponent(card.name);
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'p-2 rounded-md hover:bg-green-100 cursor-pointer text-sm search-result';
+                    resultDiv.draggable = true;
+                    resultDiv.innerHTML = `<span class="flex-1">${card.name}</span><img src="images/illusts/${safeFileName}_transparent.png" class="search-result-img">`;
+                    resultDiv.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('application/card-name', card.name);
+                        e.currentTarget.classList.add('dragging');
+                        const dragImg = new Image();
+                        dragImg.src = 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M16 4a2 2 0 00-2 2v2H2v2h10v2H6v2h6v2H4v2h8v2H8a2 2 0 00-2 2h14a2 2 0 002-2v-2h-2v-2h2v-2h-2v-2h2v-2h-2V6a2 2 0 00-2-2H16z" fill="%23fff" fill-opacity="0.8"/></svg>';
+                        e.dataTransfer.setDragImage(dragImg, 16, 16);
+                    });
+                    resultDiv.addEventListener('dragend', (e) => e.currentTarget.classList.remove('dragging'));
+                    elements.searchResults.appendChild(resultDiv);
+                });
+            };
+            
+            elements.playerHpInput.addEventListener('input', (e) => gameState.player.hp = e.target.value);
+            elements.opponentHpInput.addEventListener('input', (e) => gameState.opponent.hp = e.target.value);
+            elements.playerHpInput.addEventListener('focus', saveState);
+            elements.opponentHpInput.addEventListener('focus', saveState);
+
+            elements.cardSearchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                if (!query) { elements.searchResults.innerHTML = ''; return; }
+                renderSearchResults(cardDatabase.filter(c => c.name.toLowerCase().includes(query)));
+            });
+            
+            elements.dropZones.forEach(zone => {
+                zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+                zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+                zone.addEventListener('drop', e => {
+                    e.preventDefault(); zone.classList.remove('drag-over');
+                    const cardName = e.dataTransfer.getData('application/card-name');
+                    if(!cardName) return; // Not a card from search
+                    const cardData = cardDatabase.find(c => c.name === cardName);
+                    if (!cardData) return;
+                    saveState();
+                    const { owner, area } = zone.dataset;
+                    const isSlot = area === 'fieldCard';
+                    const targetArray = isSlot ? null : gameState[owner][area];
+                    const limit = zoneLimits[area];
+                    if (!isSlot && targetArray.length >= limit) {
+                        alert(`このゾーンには${limit}枚までしかカードを置けません。`);
+                        history.pop(); updateUndoButton(); return;
+                    }
+                    isSlot ? gameState[owner][area] = { ...cardData } : targetArray.push({ ...cardData });
+                    render();
+                });
+            });
+
+            elements.draggableCounter.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', 'counter');
+            });
+
+            elements.trashCan.addEventListener('dragover', e => { e.preventDefault(); elements.trashCan.classList.add('drag-over'); });
+            elements.trashCan.addEventListener('dragleave', () => elements.trashCan.classList.remove('drag-over'));
+            elements.trashCan.addEventListener('drop', (e) => {
+                e.preventDefault(); elements.trashCan.classList.remove('drag-over');
+                const cardInfo = JSON.parse(e.dataTransfer.getData('application/json'));
+                if(!cardInfo) return;
+                saveState();
+                const { owner, area, index } = cardInfo;
+                if(area === 'fieldCard') gameState[owner].fieldCard = null;
+                else gameState[owner][area].splice(index, 1);
+                render();
+            });
+
+            elements.undoButton.addEventListener('click', () => { if (history.length > 0) { gameState = history.pop(); render(); updateUndoButton(); } });
+            elements.resetButton.addEventListener('click', () => { if (confirm('盤面をリセットしますか？')) { saveState(); gameState = initialGameState(); render(); } });
+            elements.saveButton.addEventListener('click', () => {
+                const dataStr = JSON.stringify(gameState, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'board-state.json'; a.click();
+                URL.revokeObjectURL(url);
+            });
+            
+            let isResizing = false;
+            elements.resizer.addEventListener('mousedown', () => isResizing = true);
+            window.addEventListener('mousemove', (e) => { if(isResizing) { let w = e.clientX; w = w < 280 ? 280 : w > 600 ? 600 : w; elements.sidebar.style.width = `${w}px`; } });
+            window.addEventListener('mouseup', () => isResizing = false);
+            elements.sidebar.style.width = '350px';
+            
+            render();
+            updateUndoButton();
+        });
+    </script>
+</body>
+</html>
+
